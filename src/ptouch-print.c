@@ -54,6 +54,8 @@ char *save_png=NULL;
 int verbose=0;
 int fontsize=0;
 bool debug=false;
+bool halfcut=false;
+bool invert=false;
 
 /* --------------------------------------------------------------------
    -------------------------------------------------------------------- */
@@ -209,7 +211,7 @@ int needed_width(char *text, char *font, int fsz)
 gdImage *render_text(char *font, char *line[], int lines, int tape_width)
 {
 	int brect[8];
-	int i, black, x=0, tmp=0, fsz=0;
+	int i, fontcolor, x=0, tmp=0, fsz=0;
 	char *p;
 	gdImage *im=NULL;
 
@@ -241,13 +243,19 @@ gdImage *render_text(char *font, char *line[], int lines, int tape_width)
 		}
 	}
 	im=gdImageCreatePalette(x, tape_width);
-	gdImageColorAllocate(im, 255, 255, 255);
-	black=gdImageColorAllocate(im, 0, 0, 0);
+	if(invert){
+		gdImageColorAllocate(im, 0, 0, 0);
+		fontcolor=gdImageColorAllocate(im, 255, 255, 255);
+	}
+	else{
+		gdImageColorAllocate(im, 255, 255, 255);
+		fontcolor=gdImageColorAllocate(im, 0, 0, 0);
+	}
 	/* gdImageStringFT(im,brect,fg,fontlist,size,angle,x,y,string) */
 	/* find max needed line height for ALL lines */
 	int max_height=0;
 	for (i=0; i<lines; i++) {
-		if ((p=gdImageStringFT(NULL, &brect[0], -black, font, fsz, 0.0, 0, 0, line[i])) != NULL) {
+		if ((p=gdImageStringFT(NULL, &brect[0], -fontcolor, font, fsz, 0.0, 0, 0, line[i])) != NULL) {
 			printf(_("error in gdImageStringFT: %s\n"), p);
 		}
 		//int ofs=get_baselineoffset(line[i], font_file, fsz);
@@ -262,11 +270,11 @@ gdImage *render_text(char *font, char *line[], int lines, int tape_width)
 	/* now render lines */
 	for (i=0; i<lines; i++) {
 		int ofs=get_baselineoffset(line[i], font_file, fsz);
-		int pos=((i)*(tape_width/(lines)))+(max_height)-ofs-1;
+		int pos=((i)*(tape_width/(lines)))-ofs+max_height+(((tape_width/lines)-(max_height))/2);
 		if (debug) {
 			printf("debug: line %i pos=%i ofs=%i\n", i+1, pos, ofs);
 		}
-		if ((p=gdImageStringFT(im, &brect[0], -black, font, fsz, 0.0, 0, pos, line[i])) != NULL) {
+		if ((p=gdImageStringFT(im, &brect[0], -fontcolor, font, fsz, 0.0, 0, pos, line[i])) != NULL) {
 			printf(_("error in gdImageStringFT: %s\n"), p);
 		}
 	}
@@ -299,8 +307,8 @@ gdImage *img_append(gdImage *in_1, gdImage *in_2)
 	if (out == NULL) {
 		return NULL;
 	}
-	gdImageColorAllocate(out, 255, 255, 255);
-	gdImageColorAllocate(out, 0, 0, 0);
+	//gdImageColorAllocate(out, 255, 255, 255);
+	//gdImageColorAllocate(out, 0, 0, 0);
 	if (debug) {
 		printf("debug: created new img with size %d * %d\n", length, width);
 	}
@@ -361,15 +369,18 @@ void usage(char *progname)
 	printf("usage: %s [options] <print-command(s)>\n", progname);
 	printf("options:\n");
 	printf("\t--font <file>\t\tuse font <file> or <name>\n");
+	printf("\t--fontsize\t\tManually set fontsize\n");
+	printf("\t--invert\t\tInvert Color of Text output\n");
+	printf("\t--halfcut\t\tPrint but don't fully cut\n");
 	printf("\t--writepng <file>\tinstead of printing, write output to png file\n");
 	printf("\t\t\t\tThis currently works only when using\n\t\t\t\tEXACTLY ONE --text statement\n");
+	printf("\t--debug\t\t\tEnable debug output\n\n");
 	printf("print-commands:\n");
 	printf("\t--image <file>\t\tprint the given image which must be a 2 color\n");
 	printf("\t\t\t\t(black/white) png\n");
-	printf("\t--text <text>\t\tPrint 1-4 lines of text.\n");
+	printf("\t--text <line1> <line2>\tPrint 1-4 lines of text.\n");
 	printf("\t\t\t\tIf the text contains spaces, use quotation marks\n\t\t\t\taround it.\n");
 	printf("\t--cutmark\t\tPrint a mark where the tape should be cut\n");
-	printf("\t--fontsize\t\tManually set fontsize\n");
 	printf("\t--pad <n>\t\tAdd n pixels padding (blank tape)\n");
 	exit(1);
 }
@@ -403,7 +414,11 @@ int parse_args(int argc, char **argv)
 			}
 		} else if (strcmp(&argv[i][1], "-cutmark") == 0) {
 			continue;	/* not done here */
-		} else if (strcmp(&argv[i][1], "-debug") == 0) {
+		} else if (strcmp(&argv[i][1], "-halfcut") == 0) {
+			continue;	/* not done here */
+		} else if (strcmp(&argv[i][1], "-invert") == 0) {
+			invert=true;
+		}  else if (strcmp(&argv[i][1], "-debug") == 0) {
 			debug=true;
 		} else if (strcmp(&argv[i][1], "-info") == 0) {
 			continue;	/* not done here */
@@ -530,6 +545,10 @@ int main(int argc, char *argv[])
 			im = NULL;
 		} else if (strcmp(&argv[i][1], "-debug") == 0) {
 			debug = true;
+		} else if (strcmp(&argv[i][1], "-halfcut") == 0) {
+			halfcut = true;
+		} else if (strcmp(&argv[i][1], "-invert") == 0) {
+			continue;
 		} else {
 			usage(argv[0]);
 		}
@@ -539,10 +558,19 @@ int main(int argc, char *argv[])
 			write_png(out, save_png);
 		} else {
 			print_img(ptdev, out);
-			if (ptouch_eject(ptdev) != 0) {
-				printf(_("ptouch_eject() failed\n"));
-				return -1;
+			if (halfcut) {
+				if (ptouch_ff(ptdev) != 0) {
+					printf(_("ptouch_ff() failed\n"));
+					return -1;
+				}
 			}
+			else {
+				if (ptouch_eject(ptdev) != 0) {
+					printf(_("ptouch_eject() failed\n"));
+					return -1;
+				}
+			}
+			
 		}
 		gdImageDestroy(out);
 	}

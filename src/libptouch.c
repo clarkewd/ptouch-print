@@ -34,6 +34,7 @@
 
 /* Print area width in 180 DPI pixels */
 struct _pt_tape_info tape_info[]= {
+	{ 4, 24, 0.5},  /* 3.5 mm tape */
 	{ 6, 32, 1.0},	/* 6 mm tape */
 	{ 9, 52, 1.0},	/* 9 mm tape */
 	{12, 76, 2.0},	/* 12 mm tape */
@@ -65,6 +66,8 @@ struct _pt_dev_info ptdevs[] = {
 	   remark that it also needs some padding (white pixels) */
 	{0x04f9, 0x2061, "PT-P700", 128, 180, FLAG_RASTER_PACKBITS|FLAG_P700_INIT},
 	{0x04f9, 0x2064, "PT-P700 (PLite Mode)", 128, 180, FLAG_PLITE},
+	{0x04f9, 0x2062, "PT-P750W", 128, 180, FLAG_RASTER_PACKBITS|FLAG_P700_INIT},
+	{0x04f9, 0x2065, "PT-P750W (PLite Mode)", 128, 180, FLAG_PLITE},
 	{0x04f9, 0x2073, "PT-D450", 128, 180, FLAG_RASTER_PACKBITS},
 	/* Notes about the PT-D450: I'm unsure if print width really is 128px */
 	{0x04f9, 0x2074, "PT-D600", 128, 180, FLAG_RASTER_PACKBITS},
