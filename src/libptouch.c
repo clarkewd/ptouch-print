@@ -257,7 +257,7 @@ int ptouch_getstatus(ptouch_dev ptdev)
 			return -1;
 		}
 		tries++;
-		if (tries > 10) {
+		if (tries > 300) {
 			fprintf(stderr, _("timeout while waiting for status response\n"));
 			return -1;
 		}

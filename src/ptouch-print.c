@@ -55,6 +55,7 @@ int verbose=0;
 int fontsize=0;
 bool debug=false;
 bool halfcut=false;
+bool blocking=false;
 bool invert=false;
 
 /* --------------------------------------------------------------------
@@ -374,14 +375,18 @@ void usage(char *progname)
 	printf("\t--halfcut\t\tPrint but don't fully cut\n");
 	printf("\t--writepng <file>\tinstead of printing, write output to png file\n");
 	printf("\t\t\t\tThis currently works only when using\n\t\t\t\tEXACTLY ONE --text statement\n");
-	printf("\t--debug\t\t\tEnable debug output\n\n");
+	printf("\t--debug\t\t\tEnable debug output\n");
+	printf("\t--blocking\t\tWait until Print is finished\n\n");
 	printf("print-commands:\n");
 	printf("\t--image <file>\t\tprint the given image which must be a 2 color\n");
 	printf("\t\t\t\t(black/white) png\n");
 	printf("\t--text <line1> <line2>\tPrint 1-4 lines of text.\n");
 	printf("\t\t\t\tIf the text contains spaces, use quotation marks\n\t\t\t\taround it.\n");
 	printf("\t--cutmark\t\tPrint a mark where the tape should be cut\n");
-	printf("\t--pad <n>\t\tAdd n pixels padding (blank tape)\n");
+	printf("\t--pad <n>\t\tAdd n pixels padding (blank tape)\n\n");
+	printf("control-commands:\n");
+	printf("\t--status\t\tOutputs Printer Status\n");
+	printf("\t--info\t\t\tOutputs Printer Info\n\n");
 	exit(1);
 }
 
@@ -420,8 +425,14 @@ int parse_args(int argc, char **argv)
 			invert=true;
 		}  else if (strcmp(&argv[i][1], "-debug") == 0) {
 			debug=true;
+		} else if (strcmp(&argv[i][1], "-blocking") == 0) {
+			continue;
 		} else if (strcmp(&argv[i][1], "-info") == 0) {
 			continue;	/* not done here */
+		} else if (strcmp(&argv[i][1], "-status") == 0) {
+			continue;	/* not done here */
+		} else if (strcmp(&argv[i][1], "-silent") == 0) {
+			continue;
 		} else if (strcmp(&argv[i][1], "-image") == 0) {
 			if (i+1<argc) {
 				i++;
@@ -507,6 +518,8 @@ int main(int argc, char *argv[])
 			printf("text color = %02x\n", ptdev->status->text_color);
 			printf("error = %04x\n", ptdev->status->error);
 			exit(0);
+		} else if (strcmp(&argv[i][1], "-status") == 0) {
+			printf("printer status = %02x\n", ptdev->status->status_type);
 		} else if (strcmp(&argv[i][1], "-image") == 0) {
 			if ((im=image_load(argv[++i])) == NULL) {
 				printf(_("failed to load image file\n"));
@@ -545,6 +558,8 @@ int main(int argc, char *argv[])
 			im = NULL;
 		} else if (strcmp(&argv[i][1], "-debug") == 0) {
 			debug = true;
+		} else if (strcmp(&argv[i][1], "-blocking") == 0) {
+			blocking = true;
 		} else if (strcmp(&argv[i][1], "-halfcut") == 0) {
 			halfcut = true;
 		} else if (strcmp(&argv[i][1], "-invert") == 0) {
@@ -570,7 +585,15 @@ int main(int argc, char *argv[])
 					return -1;
 				}
 			}
-			
+			while(blocking){		//wait for status 00
+				if (ptouch_getstatus(ptdev) != 0) {
+					printf(_("ptouch_getstatus() failed\n"));
+					return 1;
+				}
+				if(ptdev->status->status_type == 0x00){
+					break;
+				}
+			}
 		}
 		gdImageDestroy(out);
 	}
