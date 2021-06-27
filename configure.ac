@@ -1,7 +1,7 @@
 #
 #	ptouch-print - Print labels with images or text on a Brother P-Touch
 #	
-#	Copyright (C) 2015 Dominic Radermacher <blip@mockmoon-cybernetics.ch>
+#	Copyright (C) 2015-2021 Dominic Radermacher <dominic@familie-radermacher.ch>
 #
 #	This program is free software; you can redistribute it and/or modify it
 #	under the terms of the GNU General Public License version 3 as
@@ -20,7 +20,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.69])
-AC_INIT([ptouch], [m4_esyscmd_s([build-aux/git-version-gen])], [blip@mockmoon-cybernetics.ch])
+AC_INIT([ptouch], [m4_esyscmd_s([build-aux/git-version-gen])], [dominic@familie-radermacher.ch])
 AC_CONFIG_SRCDIR([src/libptouch.c])
 AC_CONFIG_HEADERS([config.h])
 

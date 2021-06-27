@@ -1,7 +1,7 @@
 /*
 	ptouch-print - Print labels with images or text on a Brother P-Touch
 
-	Copyright (C) 2015-2019 Dominic Radermacher <blip@mockmoon-cybernetics.ch>
+	Copyright (C) 2015-2021 Dominic Radermacher <dominic@familie-radermacher.ch>
 
 	This program is free software; you can redistribute it and/or modify it
 	under the terms of the GNU General Public License version 3 as
@@ -32,12 +32,22 @@ struct _pt_tape_info {
 #define FLAG_PLITE		(1 << 2)
 #define FLAG_P700_INIT		(1 << 3)
 
+typedef enum _pt_page_flags {
+	FEED_NONE	= 0x0,
+	FEED_SMALL	= 0x08,
+	FEED_MEDIUM	= 0x0c,
+	FEED_LARGE	= 0x1a,
+	AUTO_CUT	= (1 << 6),
+	MIRROR		= (1 << 7),
+} pt_page_flags;
+
 struct _pt_dev_info {
 	int vid;		/* USB vendor ID */
 	int pid;		/* USB product ID */
 	char *name;
 	int max_px;		/* Maximum pixel width that can be printed */
 	int dpi;		/* Dots per inch of the printhead */
+	//size_t bytes_per_line;
 	int flags;
 };
 typedef struct _pt_dev_info *pt_dev_info;
@@ -94,3 +104,4 @@ int ptouch_getmaxwidth(ptouch_dev ptdev);
 int ptouch_enable_packbits(ptouch_dev ptdev);
 int ptouch_rasterstart(ptouch_dev ptdev);
 int ptouch_sendraster(ptouch_dev ptdev, uint8_t *data, size_t len);
+void ptouch_list_supported();

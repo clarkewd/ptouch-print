@@ -1,7 +1,7 @@
 /*
 	libptouch - functions to help accessing a brother ptouch
 
-	Copyright (C) 2013-2020 Dominic Radermacher <blip@mockmoon-cybernetics.ch>
+	Copyright (C) 2013-2021 Dominic Radermacher <dominic@familie-radermacher.ch>
 
 	This program is free software; you can redistribute it and/or modify it
 	under the terms of the GNU General Public License version 3 as
@@ -34,6 +34,7 @@
 
 /* Print area width in 180 DPI pixels */
 struct _pt_tape_info tape_info[]= {
+	{ 4, 24, 0.5},	/* 3.5 mm tape */
 	{ 6, 32, 1.0},	/* 6 mm tape */
 	{ 9, 52, 1.0},	/* 9 mm tape */
 	{12, 76, 2.0},	/* 12 mm tape */
@@ -47,6 +48,7 @@ struct _pt_dev_info ptdevs[] = {
 	{0x04f9, 0x2007, "PT-2420PC", 128, 180, FLAG_RASTER_PACKBITS},	/* 180dpi, 128px, maximum tape width 24mm, must send TIFF compressed pixel data */
 	{0x04f9, 0x2011, "PT-2450PC", 128, 180, FLAG_RASTER_PACKBITS},
 	{0x04f9, 0x2019, "PT-1950", 128, 180, FLAG_RASTER_PACKBITS},	/* 180dpi, apparently 112px printhead ?, maximum tape width 18mm - unconfirmed if it works */
+	{0x04f9, 0x201f, "PT-2700", 128, 180, FLAG_NONE},
 	{0x04f9, 0x202c, "PT-1230PC", 128, 180, FLAG_NONE},		/* 180dpi, supports tapes up to 12mm - I don't know how much pixels it can print! */
 	/* Notes about the PT-1230PC: While it is true that this printer supports
 	   max 12mm tapes, it apparently expects > 76px data - the first 32px
@@ -65,12 +67,15 @@ struct _pt_dev_info ptdevs[] = {
 	   remark that it also needs some padding (white pixels) */
 	{0x04f9, 0x2061, "PT-P700", 128, 180, FLAG_RASTER_PACKBITS|FLAG_P700_INIT},
 	{0x04f9, 0x2064, "PT-P700 (PLite Mode)", 128, 180, FLAG_PLITE},
+	{0x04f9, 0x2062, "PT-P750W", 128, 180, FLAG_RASTER_PACKBITS|FLAG_P700_INIT},
+	{0x04f9, 0x2065, "PT-P750W (PLite Mode)", 128, 180, FLAG_PLITE},
 	{0x04f9, 0x2073, "PT-D450", 128, 180, FLAG_RASTER_PACKBITS},
 	/* Notes about the PT-D450: I'm unsure if print width really is 128px */
 	{0x04f9, 0x2074, "PT-D600", 128, 180, FLAG_RASTER_PACKBITS},
 	/* PT-D600 was reported to work, but with some quirks (premature
 	   cutting of tape, printing maximum of 73mm length) */
 	//{0x04f9, 0x200d, "PT-3600", 384, 360, FLAG_RASTER_PACKBITS},
+	{0x04f9, 0x20af, "PT-P710BT", 128, 180, FLAG_RASTER_PACKBITS},
 	{0,0,"",0,0,0}
 };
 
@@ -254,7 +259,7 @@ int ptouch_getstatus(ptouch_dev ptdev)
 			return -1;
 		}
 		tries++;
-		if (tries > 10) {
+		if (tries > 300) {
 			fprintf(stderr, _("timeout while waiting for status response\n"));
 			return -1;
 		}
@@ -326,4 +331,15 @@ int ptouch_sendraster(ptouch_dev ptdev, uint8_t *data, size_t len)
 		rc = ptouch_send(ptdev, buf, len + 3);
 	}
 	return rc;
+}
+
+void ptouch_list_supported()
+{
+	printf("Supported printers (some might have quirks)\n");
+	for (int i=0; ptdevs[i].vid > 0; i++) {
+		if ((ptdevs[i].flags & FLAG_PLITE) != FLAG_PLITE) {
+			printf("\t%s\n", ptdevs[i].name);
+		}
+	}
+	return;
 }

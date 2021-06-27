@@ -1,7 +1,7 @@
 /*
 	ptouch-print - Print labels with images or text on a Brother P-Touch
 
-	Copyright (C) 2015-2019 Dominic Radermacher <blip@mockmoon-cybernetics.ch>
+	Copyright (C) 2015-2021 Dominic Radermacher <dominic@familie-radermacher.ch>
 
 	This program is free software; you can redistribute it and/or modify it
 	under the terms of the GNU General Public License version 3 as
@@ -54,6 +54,9 @@ char *save_png=NULL;
 int verbose=0;
 int fontsize=0;
 bool debug=false;
+bool halfcut=false;
+bool blocking=false;
+bool invert=false;
 
 /* --------------------------------------------------------------------
    -------------------------------------------------------------------- */
@@ -126,15 +129,24 @@ gdImage *image_load(const char *file)
 	FILE *f;
 	gdImage *img=NULL;
 
-	if ((f = fopen(file, "rb")) == NULL) {	/* error cant open file */
+	if (!strcmp(file, "-")) {
+		f = stdin;
+	} else {
+		f = fopen(file, "rb");
+	}
+	if (f  == NULL) {	/* error could not open file */
 		return NULL;
 	}
-	if (fread(d, sizeof(d), 1, f) != 1) {
-		return NULL;
-	}
-	rewind(f);
-	if (memcmp(d, png, 8) == 0) {
+	if (fseek(f, 0L, SEEK_SET)) {	/* file is not seekable. eg 'stdin' */
 		img=gdImageCreateFromPng(f);
+	} else {
+		if (fread(d, sizeof(d), 1, f) != 1) {
+			return NULL;
+		}
+		rewind(f);
+		if (memcmp(d, png, 8) == 0) {
+			img=gdImageCreateFromPng(f);
+		}
 	}
 	fclose(f);
 	return img;
@@ -209,7 +221,7 @@ int needed_width(char *text, char *font, int fsz)
 gdImage *render_text(char *font, char *line[], int lines, int tape_width)
 {
 	int brect[8];
-	int i, black, x=0, tmp=0, fsz=0;
+	int i, fontcolor, x=0, tmp=0, fsz=0;
 	char *p;
 	gdImage *im=NULL;
 
@@ -241,13 +253,18 @@ gdImage *render_text(char *font, char *line[], int lines, int tape_width)
 		}
 	}
 	im=gdImageCreatePalette(x, tape_width);
-	gdImageColorAllocate(im, 255, 255, 255);
-	black=gdImageColorAllocate(im, 0, 0, 0);
+	if (invert) {
+		gdImageColorAllocate(im, 0, 0, 0);
+		fontcolor=gdImageColorAllocate(im, 255, 255, 255);
+	} else {
+		gdImageColorAllocate(im, 255, 255, 255);
+		fontcolor=gdImageColorAllocate(im, 0, 0, 0);
+	}
 	/* gdImageStringFT(im,brect,fg,fontlist,size,angle,x,y,string) */
 	/* find max needed line height for ALL lines */
 	int max_height=0;
 	for (i=0; i<lines; i++) {
-		if ((p=gdImageStringFT(NULL, &brect[0], -black, font, fsz, 0.0, 0, 0, line[i])) != NULL) {
+		if ((p=gdImageStringFT(NULL, &brect[0], -fontcolor, font, fsz, 0.0, 0, 0, line[i])) != NULL) {
 			printf(_("error in gdImageStringFT: %s\n"), p);
 		}
 		//int ofs=get_baselineoffset(line[i], font_file, fsz);
@@ -262,11 +279,11 @@ gdImage *render_text(char *font, char *line[], int lines, int tape_width)
 	/* now render lines */
 	for (i=0; i<lines; i++) {
 		int ofs=get_baselineoffset(line[i], font_file, fsz);
-		int pos=((i)*(tape_width/(lines)))+(max_height)-ofs-1;
+		int pos=((i)*(tape_width/(lines)))-ofs+max_height+(((tape_width/lines)-(max_height))/2);
 		if (debug) {
 			printf("debug: line %i pos=%i ofs=%i\n", i+1, pos, ofs);
 		}
-		if ((p=gdImageStringFT(im, &brect[0], -black, font, fsz, 0.0, 0, pos, line[i])) != NULL) {
+		if ((p=gdImageStringFT(im, &brect[0], -fontcolor, font, fsz, 0.0, 0, pos, line[i])) != NULL) {
 			printf(_("error in gdImageStringFT: %s\n"), p);
 		}
 	}
@@ -360,17 +377,26 @@ void usage(char *progname)
 {
 	printf("usage: %s [options] <print-command(s)>\n", progname);
 	printf("options:\n");
+	printf("\t--debug\t\t\tenable debug output\n");
 	printf("\t--font <file>\t\tuse font <file> or <name>\n");
+	printf("\t--fontsize <size>\tManually set fontsize\n");
+	printf("\t--invert\t\tInvert Color of Text output\n");
+	printf("\t--halfcut\t\tPrint but don't fully cut (only for some devices)\n");
 	printf("\t--writepng <file>\tinstead of printing, write output to png file\n");
-	printf("\t\t\t\tThis currently works only when using\n\t\t\t\tEXACTLY ONE --text statement\n");
-	printf("print-commands:\n");
+	printf("\t--debug\t\t\tEnable debug output\n");
+	printf("\t--blocking\t\tWait until Print is finished, useful for scripts\n\n");
+	printf("print commands:\n");
 	printf("\t--image <file>\t\tprint the given image which must be a 2 color\n");
 	printf("\t\t\t\t(black/white) png\n");
-	printf("\t--text <text>\t\tPrint 1-4 lines of text.\n");
+	printf("\t--text <line> [line...]\tPrint 1-4 lines of text.\n");
 	printf("\t\t\t\tIf the text contains spaces, use quotation marks\n\t\t\t\taround it.\n");
 	printf("\t--cutmark\t\tPrint a mark where the tape should be cut\n");
-	printf("\t--fontsize\t\tManually set fontsize\n");
-	printf("\t--pad <n>\t\tAdd n pixels padding (blank tape)\n");
+	printf("\t--pad <n>\t\tAdd n pixels padding (blank tape)\n\n");
+	printf("other commands:\n");
+	printf("\t--version\t\tshow version info (required for bug report)\n");
+	printf("\t--info\t\t\tshow info about detected tape\n");
+	printf("\t--status\t\tOutputs Printer Status\n");
+	printf("\t--list-supported\tshow printers supported by this version\n");
 	exit(1);
 }
 
@@ -403,10 +429,20 @@ int parse_args(int argc, char **argv)
 			}
 		} else if (strcmp(&argv[i][1], "-cutmark") == 0) {
 			continue;	/* not done here */
+		} else if (strcmp(&argv[i][1], "-halfcut") == 0) {
+			continue;	/* not done here */
+		} else if (strcmp(&argv[i][1], "-invert") == 0) {
+			invert=true;
 		} else if (strcmp(&argv[i][1], "-debug") == 0) {
 			debug=true;
+		} else if (strcmp(&argv[i][1], "-blocking") == 0) {
+			continue;
 		} else if (strcmp(&argv[i][1], "-info") == 0) {
 			continue;	/* not done here */
+		} else if (strcmp(&argv[i][1], "-status") == 0) {
+			continue;	/* not done here */
+		} else if (strcmp(&argv[i][1], "-silent") == 0) {
+			continue;
 		} else if (strcmp(&argv[i][1], "-image") == 0) {
 			if (i+1<argc) {
 				i++;
@@ -428,6 +464,9 @@ int parse_args(int argc, char **argv)
 			}
 		} else if (strcmp(&argv[i][1], "-version") == 0) {
 			printf(_("ptouch-print version %s by Dominic Radermacher\n"), VERSION);
+			exit(0);
+		} else if (strcmp(&argv[i][1], "-list-supported") == 0) {
+			ptouch_list_supported();
 			exit(0);
 		} else {
 			usage(argv[0]);
@@ -492,6 +531,8 @@ int main(int argc, char *argv[])
 			printf("text color = %02x\n", ptdev->status->text_color);
 			printf("error = %04x\n", ptdev->status->error);
 			exit(0);
+		} else if (strcmp(&argv[i][1], "-status") == 0) {
+			printf("printer status = %02x\n", ptdev->status->status_type);
 		} else if (strcmp(&argv[i][1], "-image") == 0) {
 			if ((im=image_load(argv[++i])) == NULL) {
 				printf(_("failed to load image file\n"));
@@ -530,6 +571,12 @@ int main(int argc, char *argv[])
 			im = NULL;
 		} else if (strcmp(&argv[i][1], "-debug") == 0) {
 			debug = true;
+		} else if (strcmp(&argv[i][1], "-blocking") == 0) {
+			blocking = true;
+		} else if (strcmp(&argv[i][1], "-halfcut") == 0) {
+			halfcut = true;
+		} else if (strcmp(&argv[i][1], "-invert") == 0) {
+			continue;
 		} else {
 			usage(argv[0]);
 		}
@@ -539,9 +586,26 @@ int main(int argc, char *argv[])
 			write_png(out, save_png);
 		} else {
 			print_img(ptdev, out);
-			if (ptouch_eject(ptdev) != 0) {
-				printf(_("ptouch_eject() failed\n"));
-				return -1;
+			if (halfcut) {
+				if (ptouch_ff(ptdev) != 0) {
+					printf(_("ptouch_ff() failed\n"));
+					return -1;
+				}
+			}
+			else {
+				if (ptouch_eject(ptdev) != 0) {
+					printf(_("ptouch_eject() failed\n"));
+					return -1;
+				}
+			}
+			while(blocking){		//wait for status 00
+				if (ptouch_getstatus(ptdev) != 0) {
+					printf(_("ptouch_getstatus() failed\n"));
+					return 1;
+				}
+				if(ptdev->status->status_type == 0x00){
+					break;
+				}
 			}
 		}
 		gdImageDestroy(out);
